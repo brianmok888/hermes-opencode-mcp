@@ -1,0 +1,25 @@
+[Unit]
+Description=Hermes OpenCode MCP server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+WorkingDirectory=/opt/hermes-opencode-mcp
+EnvironmentFile=/etc/hermes-opencode-mcp/hermes-opencode-mcp.env
+ExecStart=/usr/bin/env python3 -m hermes_opencode_mcp
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hermes-opencode-mcp
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

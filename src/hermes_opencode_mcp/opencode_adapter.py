@@ -5,7 +5,11 @@ import json
 import shutil
 from dataclasses import dataclass
 
+from .logging_utils import get_logger
 from .sanitizer import sanitize_text
+
+
+logger = get_logger(__name__)
 
 
 @dataclass(slots=True)
@@ -50,6 +54,19 @@ class OpenCodeAdapter:
             "process_id": proc.pid,
             "command": cmd,
         }
+        logger.info(
+            "opencode_process_started",
+            extra={
+                "event_data": {
+                    "process_id": proc.pid,
+                    "directory": directory,
+                    "agent": agent,
+                    "session_id": session_id,
+                    "timeout_ms": timeout_ms,
+                    "text_length": len(text),
+                }
+            },
+        )
         timeout_seconds = max(1, timeout_ms / 1000)
         deadline = asyncio.get_running_loop().time() + timeout_seconds
 
@@ -60,6 +77,10 @@ class OpenCodeAdapter:
                 output = raw.decode("utf-8", errors="replace")
                 metadata = self._build_result_metadata(base_metadata, proc.returncode, output)
                 metadata["cancelled"] = True
+                logger.warning(
+                    "opencode_process_cancelled",
+                    extra={"event_data": {"process_id": proc.pid, "execution_handle": metadata.get("execution_handle")}},
+                )
                 return AdapterResult(
                     summary="",
                     error="opencode execution cancelled during execution",
@@ -73,6 +94,10 @@ class OpenCodeAdapter:
                 await proc.communicate()
                 timeout_metadata = dict(base_metadata)
                 timeout_metadata.update({"return_code": None, "execution_handle": f"pid:{proc.pid}"})
+                logger.warning(
+                    "opencode_process_timed_out",
+                    extra={"event_data": {"process_id": proc.pid, "timeout_ms": timeout_ms}},
+                )
                 return AdapterResult(summary="", error="opencode execution timed out", metadata=timeout_metadata)
             try:
                 await asyncio.wait_for(proc.wait(), timeout=0.05)
@@ -83,6 +108,17 @@ class OpenCodeAdapter:
         output = raw.decode("utf-8", errors="replace")
         summary, _ = parse_opencode_output(output)
         metadata = self._build_result_metadata(base_metadata, proc.returncode, output)
+        logger.info(
+            "opencode_process_finished",
+            extra={
+                "event_data": {
+                    "process_id": proc.pid,
+                    "return_code": proc.returncode,
+                    "execution_handle": metadata.get("execution_handle"),
+                    "parsed_summary_present": bool(metadata.get("parsed_summary_present")),
+                }
+            },
+        )
         if proc.returncode != 0 and not summary:
             return AdapterResult(summary="", error=sanitize_text(output[-4000:]), metadata=metadata)
         return AdapterResult(summary=summary or "OpenCode completed with no textual summary.", metadata=metadata)

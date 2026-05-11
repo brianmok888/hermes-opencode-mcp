@@ -7,13 +7,17 @@ import traceback
 from typing import Any
 
 from .config import AppConfig
-from .service import LaneService, ServiceError
+from .logging_utils import get_logger
+from .service import ExecutionService, ServiceError
+
+
+logger = get_logger(__name__)
 
 
 class MCPServer:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
-        self.service = LaneService(config)
+        self.service = ExecutionService(config)
 
     async def run(self) -> int:
         while True:
@@ -26,6 +30,7 @@ class MCPServer:
             try:
                 request = json.loads(line)
             except json.JSONDecodeError:
+                logger.warning("invalid_jsonrpc_input")
                 await self._send({"jsonrpc": "2.0", "error": {"code": -32700, "message": "parse error"}, "id": None})
                 continue
             response = await self._handle_request(request)
@@ -38,6 +43,16 @@ class MCPServer:
         params = request.get("params") or {}
         if not method:
             return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32600, "message": "invalid request"}}
+        logger.info(
+            "rpc_request",
+            extra={
+                "event_data": {
+                    "request_id": request_id,
+                    "method": method,
+                    "has_params": bool(params),
+                }
+            },
+        )
         try:
             if method == "initialize":
                 result = {
@@ -73,8 +88,16 @@ class MCPServer:
                 }
             return {"jsonrpc": "2.0", "id": request_id, "result": result}
         except ServiceError as exc:
+            logger.warning(
+                "rpc_service_error",
+                extra={"event_data": {"request_id": request_id, "method": method, "error": str(exc)}},
+            )
             return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32000, "message": str(exc)}}
         except Exception as exc:
+            logger.exception(
+                "rpc_unhandled_error",
+                extra={"event_data": {"request_id": request_id, "method": method}},
+            )
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,

@@ -109,18 +109,18 @@ class MCPClient:
     def health(self) -> dict[str, Any]:
         return self.call_tool("health")
 
-    def list_lanes(self) -> list[dict[str, Any]]:
-        return list(self.call_tool("list_lanes"))
+    def list_targets(self) -> list[dict[str, Any]]:
+        return list(self.call_tool("list_targets"))
 
-    def get_lane(self, lane_id: str) -> dict[str, Any]:
-        return dict(self.call_tool("get_lane", {"lane_id": lane_id}))
+    def get_target(self, target_id: str) -> dict[str, Any]:
+        return dict(self.call_tool("get_target", {"target_id": target_id}))
 
-    def create_task(self, *, lane_id: str, text: str, directory: str, session_id: str | None = None, agent: str | None = None, timeout_ms: int = 300_000) -> dict[str, Any]:
+    def create_task(self, *, target_id: str, text: str, directory: str, session_id: str | None = None, agent: str | None = None, timeout_ms: int = 300_000) -> dict[str, Any]:
         return dict(
             self.call_tool(
                 "create_task",
                 {
-                    "lane_id": lane_id,
+                    "target_id": target_id,
                     "text": text,
                     "directory": directory,
                     "session_id": session_id,
@@ -130,12 +130,12 @@ class MCPClient:
             )
         )
 
-    def submit_task(self, *, lane_id: str, text: str, directory: str, session_id: str | None = None, agent: str | None = None, timeout_ms: int = 300_000) -> dict[str, Any]:
+    def submit_task(self, *, target_id: str, text: str, directory: str, session_id: str | None = None, agent: str | None = None, timeout_ms: int = 300_000) -> dict[str, Any]:
         return dict(
             self.call_tool(
                 "submit_task",
                 {
-                    "lane_id": lane_id,
+                    "target_id": target_id,
                     "text": text,
                     "directory": directory,
                     "session_id": session_id,
@@ -145,12 +145,12 @@ class MCPClient:
             )
         )
 
-    def run_task(self, *, lane_id: str, text: str, directory: str, session_id: str | None = None, agent: str | None = None, timeout_ms: int = 300_000) -> dict[str, Any]:
+    def run_task(self, *, target_id: str, text: str, directory: str, session_id: str | None = None, agent: str | None = None, timeout_ms: int = 300_000) -> dict[str, Any]:
         return dict(
             self.call_tool(
                 "run_task",
                 {
-                    "lane_id": lane_id,
+                    "target_id": target_id,
                     "text": text,
                     "directory": directory,
                     "session_id": session_id,
@@ -181,18 +181,18 @@ class MCPClient:
     def submit_and_wait(
         self,
         *,
-        lane_id: str,
+        target_id: str,
         text: str,
         directory: str,
         session_id: str | None = None,
         agent: str | None = None,
         timeout_ms: int = 300_000,
         wait_timeout_seconds: int = 300,
-        require_worker_prefix: bool = True,
+        require_execution_prefix: bool = True,
         require_execution_handle: bool = True,
     ) -> dict[str, Any]:
         submitted = self.submit_task(
-            lane_id=lane_id,
+            target_id=target_id,
             text=text,
             directory=directory,
             session_id=session_id,
@@ -205,7 +205,7 @@ class MCPClient:
         task = self.wait_for_task(str(task_id), timeout_seconds=wait_timeout_seconds)
         return self._validate_terminal_task(
             task,
-            require_worker_prefix=require_worker_prefix,
+            require_execution_prefix=require_execution_prefix,
             require_execution_handle=require_execution_handle,
         )
 
@@ -256,7 +256,7 @@ class MCPClient:
         self,
         task: dict[str, Any],
         *,
-        require_worker_prefix: bool,
+        require_execution_prefix: bool,
         require_execution_handle: bool,
     ) -> dict[str, Any]:
         metadata = task.get("metadata") or {}
@@ -274,12 +274,12 @@ class MCPClient:
         if require_execution_handle and not str(metadata.get("execution_handle", "")).strip():
             raise MCPClientError("MCP task missing execution_handle metadata")
 
-        if require_worker_prefix:
-            worker_prefix = str(metadata.get("worker_prefix", "")).strip()
-            if not worker_prefix:
-                raise MCPClientError("MCP task missing worker_prefix metadata")
+        if require_execution_prefix:
+            execution_prefix = str(metadata.get("execution_prefix", "")).strip()
+            if not execution_prefix:
+                raise MCPClientError("MCP task missing execution_prefix metadata")
             body = str(task.get("summary") or task.get("error") or "").strip()
-            if body and not body.startswith(worker_prefix):
-                raise MCPClientError("MCP task output missing required worker identity prefix")
+            if body and not body.startswith(execution_prefix):
+                raise MCPClientError("MCP task output missing required execution identity prefix")
 
         return task

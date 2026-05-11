@@ -6,56 +6,76 @@ from dataclasses import replace
 from pathlib import Path
 
 from .config import AppConfig
+from .logging_utils import get_logger
 from .models import Artifact, TaskRecord, TaskRequest, new_task_id, utc_now
 from .opencode_adapter import OpenCodeAdapter
 from .sanitizer import sanitize_text
-from .store import InMemoryStore
+from .store import PersistentStore
+
+
+logger = get_logger(__name__)
 
 
 class ServiceError(RuntimeError):
     pass
 
 
-class LaneService:
+class ExecutionService:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
-        self.store = InMemoryStore(config.lane_profiles)
+        self.store = PersistentStore(config.execution_targets, config.state_dir)
         self._adapter = OpenCodeAdapter(config.opencode_bin) if config.executor_mode == "opencode" else None
         if self._adapter is not None:
             self._adapter.validate()
         self._background_tasks: dict[str, asyncio.Task] = {}
+        self._startup_recovered_tasks = self.store.reconcile_incomplete_tasks()
+        if self._startup_recovered_tasks:
+            logger.warning(
+                "service_recovered_interrupted_tasks",
+                extra={"event_data": {"recovered_tasks": len(self._startup_recovered_tasks)}},
+            )
 
     def health(self) -> dict:
+        running_tasks = 0
+        for target in self.store.targets():
+            if target.state == "busy":
+                running_tasks += 1
         return {
             "ok": True,
             "service": self.config.server_name,
             "executor_mode": self.config.executor_mode,
+            "state_dir": str(self.config.state_dir),
+            "targets": len(self.store.targets()),
+            "running_tasks": running_tasks,
+            "startup_recovered_tasks": len(self._startup_recovered_tasks),
         }
 
-    def list_lanes(self) -> list[dict]:
-        return [lane.to_dict() for lane in self.store.lanes()]
+    def list_targets(self) -> list[dict]:
+        return [target.to_dict() for target in self.store.targets()]
 
-    def get_lane(self, lane_id: str) -> dict:
-        lane = self.store.get_lane(lane_id)
-        if lane is None:
-            raise ServiceError(f"lane not found: {lane_id}")
-        return lane.to_dict()
+    def get_target(self, target_id: str) -> dict:
+        target = self.store.get_target(target_id)
+        if target is None:
+            raise ServiceError(f"target not found: {target_id}")
+        return target.to_dict()
 
     def create_task(self, payload: dict) -> dict:
         request = TaskRequest.from_dict(payload)
         errors = request.validate()
         if errors:
             raise ServiceError("; ".join(errors))
-        lane = self.store.get_lane(request.lane_id)
-        if lane is None:
-            raise ServiceError("lane not found")
-        if not lane.opencode_ready:
+        target = self.store.get_target(request.target_id)
+        if target is None:
+            raise ServiceError("target not found")
+        if not target.opencode_ready:
             raise ServiceError(
-                f"lane {lane.lane_id} is not OpenCode-ready; dedicated lanes must execute through their OpenCode worker only"
+                f"target {target.target_id} is not OpenCode-ready for MCP execution"
             )
+        if self.store.has_running_task_for_target(request.target_id):
+            raise ServiceError(f"target busy: {request.target_id}")
         task = TaskRecord(
             task_id=new_task_id(),
-            lane_id=request.lane_id,
+            target_id=request.target_id,
             text=sanitize_text(request.text),
             directory=request.directory,
             metadata={
@@ -65,6 +85,17 @@ class LaneService:
             },
         )
         self.store.add_task(task)
+        logger.info(
+            "task_created",
+            extra={
+                "event_data": {
+                    "task_id": task.task_id,
+                    "target_id": task.target_id,
+                    "directory": task.directory,
+                    "text_length": len(task.text),
+                }
+            },
+        )
         return task.to_dict()
 
     async def submit_task(self, payload: dict) -> dict:
@@ -95,6 +126,10 @@ class LaneService:
         task = self.store.request_cancel(task_id)
         if task is None:
             raise ServiceError("task not found")
+        logger.info(
+            "task_cancel_requested",
+            extra={"event_data": {"task_id": task_id, "status": task.status, "target_id": task.target_id}},
+        )
         return task.to_dict()
 
     def get_artifacts(self, task_id: str) -> list[dict]:
@@ -112,15 +147,15 @@ class LaneService:
                 "mimeType": "text/markdown",
             },
             {
-                "uri": "resource://policy/worker",
-                "name": "Worker policy",
-                "description": "Hard worker/orchestrator lane policy.",
+                "uri": "resource://policy/execution",
+                "name": "Execution policy",
+                "description": "Hard MCP execution target policy.",
                 "mimeType": "text/markdown",
             },
             {
-                "uri": "resource://templates/lanes-example",
-                "name": "Lane profile example",
-                "description": "Example JSON lane configuration file.",
+                "uri": "resource://templates/targets-example",
+                "name": "Execution target example",
+                "description": "Example JSON execution target configuration file.",
                 "mimeType": "application/json",
             },
         ]
@@ -130,15 +165,14 @@ class LaneService:
         if uri == "resource://architecture/overview":
             text = (
                 "# Architecture\n\n"
-                "Hermes resolves Telegram topic IDs to lane IDs outside this server. "
-                "The MCP server then receives lane-scoped requests and executes them through the OpenCode CLI.\n"
+                "The MCP server receives target-scoped requests from an MCP client and executes them through the OpenCode CLI.\n"
             )
             mime = "text/markdown"
-        elif uri == "resource://policy/worker":
-            text = (repo_root / "WORKER_POLICY.md").read_text(encoding="utf-8")
+        elif uri == "resource://policy/execution":
+            text = (repo_root / "MCP_POLICY.md").read_text(encoding="utf-8")
             mime = "text/markdown"
-        elif uri == "resource://templates/lanes-example":
-            text = (repo_root / "templates/lanes.example.json").read_text(encoding="utf-8")
+        elif uri == "resource://templates/targets-example":
+            text = (repo_root / "templates/targets.example.json").read_text(encoding="utf-8")
             mime = "application/json"
         else:
             raise ServiceError(f"unknown resource: {uri}")
@@ -148,17 +182,17 @@ class LaneService:
         return [
             {
                 "name": "coding-task",
-                "description": "Template for code changes on a coding lane.",
+                "description": "Template for code changes on a coding target.",
                 "arguments": [
-                    {"name": "lane_id", "required": True},
+                    {"name": "target_id", "required": True},
                     {"name": "task", "required": True},
                 ],
             },
             {
                 "name": "runtime-check",
-                "description": "Template for runtime validation on a runtime lane.",
+                "description": "Template for runtime validation on a runtime target.",
                 "arguments": [
-                    {"name": "lane_id", "required": True},
+                    {"name": "target_id", "required": True},
                     {"name": "check", "required": True},
                 ],
             },
@@ -167,13 +201,13 @@ class LaneService:
     def get_prompt(self, name: str, arguments: dict | None = None) -> dict:
         arguments = arguments or {}
         if name == "coding-task":
-            lane_id = arguments.get("lane_id", "<lane_id>")
+            target_id = arguments.get("target_id", "<target_id>")
             task = arguments.get("task", "<task>")
-            text = f"Run this coding task on lane {lane_id}: {task}"
+            text = f"Run this coding task on target {target_id}: {task}"
         elif name == "runtime-check":
-            lane_id = arguments.get("lane_id", "<lane_id>")
+            target_id = arguments.get("target_id", "<target_id>")
             check = arguments.get("check", "<check>")
-            text = f"Run this runtime validation on lane {lane_id}: {check}"
+            text = f"Run this runtime validation on target {target_id}: {check}"
         else:
             raise ServiceError(f"unknown prompt: {name}")
         return {"name": name, "messages": [{"role": "user", "content": {"type": "text", "text": text}}]}
@@ -186,23 +220,23 @@ class LaneService:
                 "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
             },
             {
-                "name": "list_lanes",
-                "description": "List available OpenCode worker lanes.",
+                "name": "list_targets",
+                "description": "List available OpenCode execution targets.",
                 "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
             },
             {
-                "name": "get_lane",
-                "description": "Get one lane profile by lane_id.",
+                "name": "get_target",
+                "description": "Get one execution target by target_id.",
                 "inputSchema": {
                     "type": "object",
-                    "properties": {"lane_id": {"type": "string"}},
-                    "required": ["lane_id"],
+                    "properties": {"target_id": {"type": "string"}},
+                    "required": ["target_id"],
                     "additionalProperties": False,
                 },
             },
             {
                 "name": "create_task",
-                "description": "Create a queued lane task without waiting for completion.",
+                "description": "Create a queued execution task without waiting for completion.",
                 "inputSchema": self._task_schema(),
             },
             {
@@ -242,7 +276,7 @@ class LaneService:
             },
             {
                 "name": "run_task",
-                "description": "Create and execute a lane task, waiting for completion.",
+                "description": "Create and execute an execution task, waiting for completion.",
                 "inputSchema": self._task_schema(),
             },
         ]
@@ -251,10 +285,10 @@ class LaneService:
         arguments = arguments or {}
         if name == "health":
             result = self.health()
-        elif name == "list_lanes":
-            result = self.list_lanes()
-        elif name == "get_lane":
-            result = self.get_lane(str(arguments.get("lane_id", "")))
+        elif name == "list_targets":
+            result = self.list_targets()
+        elif name == "get_target":
+            result = self.get_target(str(arguments.get("target_id", "")))
         elif name == "create_task":
             result = self.create_task(arguments)
         elif name == "submit_task":
@@ -275,16 +309,17 @@ class LaneService:
         task = self.store.get_task(task_id)
         if task is None:
             raise ServiceError("task not found")
+        logger.info("task_dispatch_requested", extra={"event_data": {"task_id": task_id, "target_id": task.target_id}})
         await self._execute(task)
 
     async def _execute(self, task: TaskRecord) -> None:
-        lane = self.store.get_lane(task.lane_id)
-        if lane is None:
-            failed = replace(task, status="failed", completed_at=utc_now(), error="unknown lane")
+        target = self.store.get_target(task.target_id)
+        if target is None:
+            failed = replace(task, status="failed", completed_at=utc_now(), error="unknown target")
             self.store.save_task(failed)
             return
 
-        self.store.set_lane_state(task.lane_id, "busy")
+        self.store.set_target_state(task.target_id, "busy")
         running = replace(
             task,
             status="running",
@@ -292,7 +327,7 @@ class LaneService:
             metadata=self._merge_metadata(
                 task.metadata,
                 {
-                    "worker_prefix": lane.worker_prefix,
+                    "execution_prefix": target.execution_prefix,
                     "executor_mode": self.config.executor_mode,
                     "dispatch_status": "running",
                     "dispatch_started_at": utc_now(),
@@ -300,6 +335,10 @@ class LaneService:
             ),
         )
         self.store.save_task(running)
+        logger.info(
+            "task_running",
+            extra={"event_data": {"task_id": running.task_id, "target_id": running.target_id, "executor_mode": self.config.executor_mode}},
+        )
 
         try:
             await asyncio.sleep(0.05)
@@ -309,7 +348,7 @@ class LaneService:
                     latest,
                     status="cancelled",
                     completed_at=utc_now(),
-                    summary=self._prefix_summary(lane.worker_prefix, "Task cancelled before execution adapter dispatch."),
+                    summary=self._prefix_summary(target.execution_prefix, "Task cancelled before execution adapter dispatch."),
                     metadata=self._merge_metadata(
                         latest.metadata,
                         {
@@ -319,18 +358,22 @@ class LaneService:
                     ),
                 )
                 self.store.save_task(cancelled)
-                self.store.set_lane_state(task.lane_id, "idle")
+                self.store.set_target_state(task.target_id, "idle")
+                logger.info(
+                    "task_cancelled_before_dispatch",
+                    extra={"event_data": {"task_id": latest.task_id, "target_id": latest.target_id}},
+                )
                 return
 
             if self.config.executor_mode == "mock":
                 summary = sanitize_text(
-                    f"Accepted task for lane={task.lane_id} directory={task.directory}. Execution adapter not wired yet; this is the mock MCP path."
+                    f"Accepted task for target={task.target_id} directory={task.directory}. Execution adapter not wired yet; this is the mock MCP path."
                 )
                 done = replace(
                     latest,
                     status="succeeded",
                     completed_at=utc_now(),
-                    summary=self._prefix_summary(lane.worker_prefix, summary),
+                    summary=self._prefix_summary(target.execution_prefix, summary),
                     metadata=self._merge_metadata(
                         latest.metadata,
                         {
@@ -355,9 +398,9 @@ class LaneService:
                         latest,
                         status="cancelled",
                         completed_at=utc_now(),
-                        summary=self._prefix_summary(lane.worker_prefix, "Task cancelled during execution."),
+                        summary=self._prefix_summary(target.execution_prefix, "Task cancelled during execution."),
                         error=self._prefix_summary(
-                            lane.worker_prefix,
+                            target.execution_prefix,
                             sanitize_text(result.error or "opencode execution cancelled during execution"),
                         ),
                         metadata=self._merge_metadata(
@@ -371,7 +414,7 @@ class LaneService:
                         latest,
                         status="failed",
                         completed_at=utc_now(),
-                        error=self._prefix_summary(lane.worker_prefix, sanitize_text(result.error)),
+                        error=self._prefix_summary(target.execution_prefix, sanitize_text(result.error)),
                         metadata=self._merge_metadata(
                             latest.metadata,
                             {"dispatch_status": "failed"},
@@ -379,7 +422,7 @@ class LaneService:
                         ),
                     )
                 else:
-                    validated_summary = self._normalize_worker_identity(lane.worker_prefix, result.summary)
+                    validated_summary = self._normalize_execution_identity(target.execution_prefix, result.summary)
                     done = replace(
                         latest,
                         status="succeeded",
@@ -392,20 +435,38 @@ class LaneService:
                         ),
                     )
             self.store.save_task(done)
-            self.store.set_lane_state(task.lane_id, "idle")
+            self.store.set_target_state(task.target_id, "idle")
+            logger.info(
+                "task_terminal",
+                extra={
+                    "event_data": {
+                        "task_id": done.task_id,
+                        "target_id": done.target_id,
+                        "status": done.status,
+                        "dispatch_status": (done.metadata or {}).get("dispatch_status"),
+                        "execution_handle": (done.metadata or {}).get("execution_handle"),
+                        "summary_length": len(done.summary or ""),
+                        "error_present": bool(done.error),
+                    }
+                },
+            )
         except Exception as exc:  # pragma: no cover
             failed = replace(
                 running,
                 status="failed",
                 completed_at=utc_now(),
-                error=self._prefix_summary(lane.worker_prefix, sanitize_text(str(exc))),
+                error=self._prefix_summary(target.execution_prefix, sanitize_text(str(exc))),
                 metadata=self._merge_metadata(
                     running.metadata,
                     {"dispatch_status": "failed_before_completion"},
                 ),
             )
             self.store.save_task(failed)
-            self.store.set_lane_state(task.lane_id, "degraded", error=failed.error)
+            self.store.set_target_state(task.target_id, "degraded", error=failed.error)
+            logger.exception(
+                "task_execution_failed_unhandled",
+                extra={"event_data": {"task_id": running.task_id, "target_id": running.target_id}},
+            )
 
     @staticmethod
     def _mock_artifacts(task: TaskRecord) -> list[Artifact]:
@@ -425,14 +486,14 @@ class LaneService:
         return {
             "type": "object",
             "properties": {
-                "lane_id": {"type": "string"},
+                "target_id": {"type": "string"},
                 "text": {"type": "string"},
                 "directory": {"type": "string"},
                 "session_id": {"type": "string"},
                 "agent": {"type": "string"},
                 "timeout_ms": {"type": "integer", "minimum": 1},
             },
-            "required": ["lane_id", "text", "directory"],
+            "required": ["target_id", "text", "directory"],
             "additionalProperties": False,
         }
 
@@ -446,7 +507,7 @@ class LaneService:
         return f"{prefix} {stripped}"
 
     @staticmethod
-    def _normalize_worker_identity(expected_prefix: str, text: str) -> str:
+    def _normalize_execution_identity(expected_prefix: str, text: str) -> str:
         stripped = sanitize_text((text or "").strip())
         if not stripped:
             return expected_prefix
@@ -456,7 +517,7 @@ class LaneService:
             first_line = re.sub(r"^oc@[^\s:]+@[^\s:]+:\s*", "", first_line, count=1).strip()
             lines[0] = first_line
             stripped = "\n".join(lines).strip()
-        return LaneService._prefix_summary(expected_prefix, stripped)
+        return ExecutionService._prefix_summary(expected_prefix, stripped)
 
     @staticmethod
     def _merge_metadata(*parts: dict) -> dict:
