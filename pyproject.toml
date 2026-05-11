@@ -1,0 +1,28 @@
+[project]
+name = "hermes-opencode-mcp"
+version = "0.1.0"
+description = "MCP-native Hermes/OpenCode lane orchestrator using the OpenCode CLI backend."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9,<10",
+]
+
+[project.scripts]
+hermes-opencode-mcp = "hermes_opencode_mcp.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,21 @@
+{
+  "generic_topic_id": 1000,
+  "routes": [
+    {
+      "topic_id": 1001,
+      "label": "coding-node-1",
+      "server_command": "python3",
+      "server_args": ["-m", "hermes_opencode_mcp"],
+      "lane_id": "coding-node-1",
+      "mode": "opencode"
+    },
+    {
+      "topic_id": 1002,
+      "label": "runtime-node-1",
+      "server_command": "python3",
+      "server_args": ["-m", "hermes_opencode_mcp"],
+      "lane_id": "runtime-node-1",
+      "mode": "opencode"
+    }
+  ]
+}
