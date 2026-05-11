@@ -12,6 +12,16 @@ MCP client -> hermes-opencode-mcp -> OpenCode CLI -> result/artifacts
 
 This repo intentionally uses the **OpenCode CLI** as the backend executor, not a local OpenCode runtime API.
 
+## Routing boundary
+
+Telegram forum-topic routing belongs in **Hermes**, not in this MCP server.
+
+- Hermes should map `chat_id` + `topic_id` to an execution `target_id`
+- Hermes should decide whether a topic message is normal chat or task submission
+- `hermes-opencode-mcp` should only receive explicit execution requests for a chosen `target_id`
+
+See [`TOPIC_ROUTING.md`](./TOPIC_ROUTING.md) for the recommended boundary, examples, and operator guidance.
+
 ## Production-oriented capabilities
 
 - persistent task and target state on disk
@@ -53,6 +63,31 @@ Optional:
 ## Example execution target file
 
 See [`templates/targets.example.json`](./templates/targets.example.json).
+
+Important: do **not** encode Telegram topic IDs into target definitions or target names. Keep targets platform-agnostic and let Hermes own topic-to-target mapping.
+
+## Example Hermes topic routing config
+
+See these repo-local Hermes-side routing examples:
+
+- [`templates/topic-routing.example.yaml`](./templates/topic-routing.example.yaml)
+- [`templates/topic-routing.example.json`](./templates/topic-routing.example.json)
+
+This config is intentionally **Hermes-owned**, not MCP server config.
+
+For a quick visual overview, see [`docs/TOPIC_ROUTING_FLOW.md`](./docs/TOPIC_ROUTING_FLOW.md).
+
+## Exported Hermes skill copy
+
+This repo also includes a sanitized export copy of the Hermes skill:
+
+- [`docs/hermes-skills/hermes-telegram-topic-routing/SKILL.md`](./docs/hermes-skills/hermes-telegram-topic-routing/SKILL.md)
+
+If you want an agent to install or recreate that skill in Hermes, use:
+
+- [`docs/hermes-skills/INSTALL_HERMES_SKILL.md`](./docs/hermes-skills/INSTALL_HERMES_SKILL.md)
+
+That install note includes a reusable prompt that points directly at the exported skill doc.
 
 ## Running
 
@@ -127,6 +162,32 @@ with MCPClient(
     print(result)
 ```
 
+## Hermes -> MCP task payload example
+
+Once Hermes has already mapped a Telegram topic to a target, the MCP-facing request should be explicit and platform-agnostic.
+
+Example logical payload:
+
+```json
+{
+  "target_id": "coding-node-1",
+  "directory": "/path/to/coding-repo",
+  "text": "fix the failing import and run tests"
+}
+```
+
+Equivalent Python client call:
+
+```python
+result = client.submit_and_wait(
+    target_id="coding-node-1",
+    directory="/path/to/coding-repo",
+    text="fix the failing import and run tests",
+)
+```
+
+The important design rule is that `chat_id` and `topic_id` should already have been resolved by Hermes before this call is made.
+
 ## Operational notes
 
 - State is persisted under `HERMES_MCP_STATE_DIR` in JSON files.
@@ -135,6 +196,7 @@ with MCPClient(
 - `health` now reports `state_dir`, target count, current running task count, and `startup_recovered_tasks`.
 - `mock` executor is for local verification only; production use should set `HERMES_MCP_EXECUTOR=opencode`.
 - Logs are structured JSON by default and intentionally avoid storing full task prompts or full execution output; only metadata such as task IDs, target IDs, lengths, and execution handles are emitted.
+- If Hermes is the caller, keep platform-specific routing concerns outside this repo; topic/thread mapping should be handled before invoking MCP tools.
 
 ## Live E2E verification
 

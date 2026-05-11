@@ -1,0 +1,32 @@
+{
+  "telegram": {
+    "routing": {
+      "default_behavior": "hermes_chat",
+      "open_topic_messages_as_tasks": true,
+      "topic_to_target": [
+        {
+          "chat_id": "<telegram_chat_id>",
+          "topic_id": "<coding_topic_id>",
+          "topic_name": "Coding Worker",
+          "target_id": "coding-target",
+          "directory": "/path/to/coding-repo",
+          "mode": "worker"
+        },
+        {
+          "chat_id": "<telegram_chat_id>",
+          "topic_id": "<runtime_topic_id>",
+          "topic_name": "Runtime Worker",
+          "target_id": "runtime-target",
+          "directory": "/path/to/runtime-repo",
+          "mode": "worker"
+        },
+        {
+          "chat_id": "<telegram_chat_id>",
+          "topic_id": "<general_topic_id>",
+          "topic_name": "General Coordination",
+          "mode": "hermes_only"
+        }
+      ]
+    }
+  }
+}

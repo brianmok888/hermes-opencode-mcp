@@ -28,6 +28,11 @@ This repo itself is the MCP layer. It expects:
 - a targets JSON file
 - a writable state directory
 
+Important boundary:
+- Telegram topic/thread routing belongs in Hermes
+- this repo should receive an already-chosen `target_id`
+- do not add Telegram-specific routing logic here
+
 ---
 
 ## 1. Preflight checks
@@ -117,11 +122,11 @@ Create the real file:
 sudo tee /etc/hermes-opencode-mcp/targets.json >/dev/null <<'JSON'
 [
   {
-    "target_id": "coding-node-1",
-    "node_id": "node-1",
-    "hostname": "vm02",
-    "vm_name": "vm02",
-    "ip_address": "192.168.4.82",
+    "target_id": "coding-target",
+    "node_id": "node-a",
+    "hostname": "devbox-a",
+    "vm_name": "devbox-a",
+    "ip_address": "10.0.0.10",
     "role": "coding-node",
     "repo_path": "/path/to/repo/on/target",
     "opencode_ready": true
@@ -136,6 +141,7 @@ Rules:
 - `ip_address` is required
 - `repo_path` must be correct for the execution target
 - `opencode_ready` should be `true` only when that target is actually usable
+- keep target IDs stable and platform-agnostic; do not derive them from Telegram topic IDs
 
 Verify JSON:
 
@@ -241,7 +247,7 @@ set -a
 source /etc/hermes-opencode-mcp/hermes-opencode-mcp.env
 set +a
 python scripts/e2e_live.py \
-  --target-id coding-node-1 \
+  --target-id coding-target \
   --directory /path/to/repo/on/target \
   --targets-file /etc/hermes-opencode-mcp/targets.json
 ```
@@ -336,6 +342,20 @@ python -m hermes_opencode_mcp
 with the same environment variables from the env file.
 
 Do not put Telegram-specific logic into this repo.
+
+For Telegram forum-topic deployments:
+- Hermes should read `chat_id` + `topic_id`
+- Hermes should map that to `target_id`
+- Hermes should call this MCP server with the chosen target
+- this repo should stay transport-agnostic and execution-focused
+
+See [`TOPIC_ROUTING.md`](./TOPIC_ROUTING.md) for the recommended topic-to-target boundary and config examples.
+
+If you also want Hermes to carry this routing logic as a reusable skill, see the exported repo copy and install instructions:
+- [`docs/hermes-skills/hermes-telegram-topic-routing/SKILL.md`](./docs/hermes-skills/hermes-telegram-topic-routing/SKILL.md)
+- [`docs/hermes-skills/INSTALL_HERMES_SKILL.md`](./docs/hermes-skills/INSTALL_HERMES_SKILL.md)
+
+The install note includes a reusable agent prompt that points to the skill document directly.
 
 ---
 
