@@ -22,6 +22,8 @@ Telegram forum-topic routing belongs in **Hermes**, not in this MCP server.
 
 See [`TOPIC_ROUTING.md`](./TOPIC_ROUTING.md) for the recommended boundary, examples, and operator guidance.
 
+Sanitized, git-tracked Hermes skill exports live under [`docs/hermes-skills/`](./docs/hermes-skills/). Use the install/check helper scripts under [`scripts/`](./scripts/) to install repo-reviewed skill copies reproducibly into `~/.hermes/skills/`.
+
 ## Production-oriented capabilities
 
 - persistent task and target state on disk
