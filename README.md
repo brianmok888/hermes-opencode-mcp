@@ -107,19 +107,17 @@ Or via the console script:
 hermes-opencode-mcp
 ```
 
-## Migration and cleanup
+## Runtime architecture
 
-This repository is now the canonical home for the Hermes/OpenCode execution implementation.
+This repository is the canonical and only supported home for the Hermes/OpenCode execution implementation.
 
-Legacy bridge-specific operational assets preserved here:
+The supported architecture is MCP-native and CLI-first:
 
-- [`docs/MIGRATION_FROM_BRIDGE.md`](./docs/MIGRATION_FROM_BRIDGE.md)
-- [`docs/legacy-bridge/ONBOARDING.md`](./docs/legacy-bridge/ONBOARDING.md)
-- [`docs/legacy-bridge/WORKER_POLICY.md`](./docs/legacy-bridge/WORKER_POLICY.md)
-- [`docs/legacy-bridge/SKILL.md`](./docs/legacy-bridge/SKILL.md)
-- [`scripts/provision-bridge-target.py`](./scripts/provision-bridge-target.py)
+```text
+Hermes -> MCP client -> hermes-opencode-mcp -> OpenCode CLI -> result/artifacts
+```
 
-The provisioning helper is retained only for migration / decommissioning support of old bridge deployments. The supported runtime architecture of this repository remains MCP-native.
+Deprecated bridge-era HTTP service and lane-specific operational tracks are intentionally excluded from this repository.
 
 ## Systemd packaging
 
