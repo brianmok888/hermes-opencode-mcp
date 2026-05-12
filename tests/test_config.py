@@ -21,6 +21,8 @@ def test_load_config(monkeypatch, tmp_path):
         'role': 'coding-node',
         'repo_path': '/tmp/repo',
         'opencode_ready': True,
+        'opencode_base_url': 'http://192.168.4.82:4096',
+        'opencode_auth_token_env': 'VM02_OPENCODE_TOKEN',
     }]))
     monkeypatch.setenv('HERMES_MCP_TARGETS_FILE', str(targets))
     monkeypatch.setenv('HERMES_MCP_EXECUTOR', 'mock')
@@ -33,6 +35,8 @@ def test_load_config(monkeypatch, tmp_path):
     assert config.state_dir == state_dir
     assert config.log_level == 'INFO'
     assert config.log_json is True
+    assert config.execution_targets['coding-node-1'].opencode_base_url == 'http://192.168.4.82:4096'
+    assert config.execution_targets['coding-node-1'].opencode_auth_token_env == 'VM02_OPENCODE_TOKEN'
 
 
 def test_missing_env(monkeypatch):

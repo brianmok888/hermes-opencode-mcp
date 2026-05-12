@@ -21,6 +21,8 @@ def test_client_end_to_end(tmp_path: Path):
                     "role": "coding-node",
                     "repo_path": str(tmp_path),
                     "opencode_ready": True,
+                    "opencode_base_url": "http://192.168.4.82:4096",
+                    "opencode_auth_token_env": "VM02_OPENCODE_TOKEN",
                 }
             ]
         ),
@@ -46,6 +48,8 @@ def test_client_end_to_end(tmp_path: Path):
         assert health["state_dir"] == str(state_dir)
         target = client.get_target("coding-node-1")
         assert target["vm_name"] == "vm02"
+        assert target["opencode_base_url"] == "http://192.168.4.82:4096"
+        assert target["opencode_auth_token_env"] == "VM02_OPENCODE_TOKEN"
         result = client.run_task(target_id="coding-node-1", text="say hi", directory=str(tmp_path))
         assert result["status"] == "succeeded"
         assert result["summary"].startswith("oc@vm02@192.168.4.82:")

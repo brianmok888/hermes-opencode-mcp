@@ -57,6 +57,8 @@ class ExecutionTarget:
     push_allowed: bool = False
     pull_allowed: bool = False
     runtime_test_allowed: bool = False
+    opencode_base_url: str | None = None
+    opencode_auth_token_env: str | None = None
     state: TargetState = "idle"
     last_error: str | None = None
     updated_at: str = field(default_factory=utc_now)
@@ -79,6 +81,8 @@ class ExecutionTarget:
             push_allowed=bool(payload.get("push_allowed", False)),
             pull_allowed=bool(payload.get("pull_allowed", False)),
             runtime_test_allowed=bool(payload.get("runtime_test_allowed", False)),
+            opencode_base_url=(str(payload.get("opencode_base_url")).strip() if payload.get("opencode_base_url") else None),
+            opencode_auth_token_env=(str(payload.get("opencode_auth_token_env")).strip() if payload.get("opencode_auth_token_env") else None),
             state=str(payload.get("state", "idle")),
             last_error=payload.get("last_error"),
             updated_at=str(payload.get("updated_at", utc_now())),

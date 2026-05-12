@@ -20,6 +20,8 @@ def build_service(tmp_path: Path) -> ExecutionService:
         role="coding-node",
         repo_path=str(tmp_path),
         opencode_ready=True,
+        opencode_base_url="http://192.168.4.82:4096",
+        opencode_auth_token_env="VM02_OPENCODE_TOKEN",
     )
     state_dir = tmp_path / "state"
     config = AppConfig(
@@ -52,6 +54,8 @@ def test_list_targets(tmp_path):
     service = build_service(tmp_path)
     targets = service.list_targets()
     assert targets[0]["target_id"] == "coding-node-1"
+    assert targets[0]["opencode_base_url"] == "http://192.168.4.82:4096"
+    assert targets[0]["opencode_auth_token_env"] == "VM02_OPENCODE_TOKEN"
 
 
 def test_run_task_mock(tmp_path):

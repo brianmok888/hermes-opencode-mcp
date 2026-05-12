@@ -32,6 +32,7 @@ See [`TOPIC_ROUTING.md`](./TOPIC_ROUTING.md) for the recommended boundary, examp
 - structured JSON logging with retention-safe metadata-only task events
 - startup reconciliation for interrupted queued/running tasks after restart
 - stdio MCP server plus Python client helper
+- target metadata fields for direct OpenCode serve endpoints and per-target auth env names
 
 ## Current MCP tools
 
@@ -65,6 +66,44 @@ Optional:
 See [`templates/targets.example.json`](./templates/targets.example.json).
 
 Important: do **not** encode Telegram topic IDs into target definitions or target names. Keep targets platform-agnostic and let Hermes own topic-to-target mapping.
+
+Optional target metadata may include:
+
+- `opencode_base_url`: direct `opencode serve` endpoint for that target, useful for LAN-first operator workflows and human attach/debug handoff
+- `opencode_auth_token_env`: environment variable name that would contain a bearer token or similar auth material for that target's OpenCode endpoint
+
+Install/bootstrap should ask the operator whether the VM is on the local network or remote, then ask for the IP/address to write into target config.
+
+Suggested install questionnaire:
+
+- VM type: `local network` or `remote`
+- VM IP/address: `<ip-or-hostname>`
+- optional direct OpenCode serve URL: `http://<ip-or-hostname>:4096`
+- optional auth env var name: `<TOKEN_ENV_NAME>`
+- if auth is needed, confirm the VM already has the required auth-bearing environment or service config that `opencode serve` will read
+- if auth is needed, let the user SSH to the VM and generate a token there, for example:
+
+```bash
+ssh <vm-host> 'openssl rand -hex 32'
+```
+
+Then store that token in the VM environment or service config, and record only the env var name in `opencode_auth_token_env`.
+
+Example VM-side env file snippet:
+
+```dotenv
+OPENCODE_AUTH_TOKEN=<generated-token>
+```
+
+Or if the service expects a named variable per target:
+
+```dotenv
+VM02_OPENCODE_TOKEN=<generated-token>
+```
+
+The MCP repo should never store the raw token value in `targets.json` or checked-in docs.
+
+These fields are descriptive target metadata only right now. They let the MCP repo absorb bridge-era operational knowledge without reintroducing the old bridge runtime into the MCP service itself.
 
 ## Example Hermes topic routing config
 
@@ -208,6 +247,7 @@ The important design rule is that `chat_id` and `topic_id` should already have b
 - `health` now reports `state_dir`, target count, current running task count, and `startup_recovered_tasks`.
 - `mock` executor is for local verification only; production use should set `HERMES_MCP_EXECUTOR=opencode`.
 - Logs are structured JSON by default and intentionally avoid storing full task prompts or full execution output; only metadata such as task IDs, target IDs, lengths, and execution handles are emitted.
+- If a target defines `opencode_base_url`, treat it as operator-facing metadata for direct LAN or human attach workflows; current task execution still runs through the local OpenCode CLI adapter.
 - If Hermes is the caller, keep platform-specific routing concerns outside this repo; topic/thread mapping should be handled before invoking MCP tools.
 
 ## Live E2E verification

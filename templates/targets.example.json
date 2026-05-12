@@ -12,6 +12,8 @@
     "push_allowed": true,
     "pull_allowed": false,
     "runtime_test_allowed": false,
+    "opencode_base_url": "http://192.168.4.82:4096",
+    "opencode_auth_token_env": "VM02_OPENCODE_TOKEN",
     "state": "idle"
   },
   {
