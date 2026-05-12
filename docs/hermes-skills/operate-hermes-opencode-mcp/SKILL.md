@@ -35,7 +35,7 @@ Use this skill for normal ongoing operations after the service is already instal
 - Keep topic routing in Hermes and execution in MCP.
 - Keep `target_id` explicit.
 - Do not claim execution succeeded unless the MCP service returned a real terminal success state.
-- Treat `opencode_base_url` as metadata/handoff info unless a dedicated serve executor exists.
+- Treat `opencode_base_url` as metadata/handoff info only; do not use it as the primary MCP/CLI validation path unless a dedicated serve executor exists.
 - Prefer sanitized logs and metadata over dumping raw prompts or outputs broadly.
 
 ## Typical operator tasks

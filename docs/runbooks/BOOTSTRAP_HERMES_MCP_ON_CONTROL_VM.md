@@ -16,11 +16,11 @@ Collect before writing config:
 
 - VM type: `local network` or `remote`
 - VM IP/address: `<ip-or-hostname>`
-- optional direct OpenCode serve URL: `http://<ip-or-hostname>:4096`
-- optional auth env var name: `<TOKEN_ENV_NAME>`
+- optional direct OpenCode endpoint metadata: `<scheme>://<ip-or-hostname>:<port>`
+- optional auth env var name metadata: `<TOKEN_ENV_NAME>`
 
-If auth is needed:
-- confirm the target VM already has the auth-bearing env/service config that `opencode serve` reads
+If auth metadata is recorded:
+- confirm the target VM already has the auth-bearing env/service config for that endpoint
 - if needed, generate on the VM side only:
 
 ```bash
@@ -80,7 +80,7 @@ Then edit it with explicit target values. Example shape:
     "role": "coding-node",
     "repo_path": "/path/to/repo/on/target",
     "opencode_ready": true,
-    "opencode_base_url": "http://10.0.0.10:4096",
+    "opencode_base_url": "http://10.0.0.10:<port>",
     "opencode_auth_token_env": "VM02_OPENCODE_TOKEN"
   }
 ]

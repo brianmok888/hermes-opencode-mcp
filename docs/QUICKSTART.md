@@ -9,7 +9,7 @@ Use this page when you want the shortest correct setup path for a new `hermes-op
    - confirm VM IP/address
    - install OpenCode CLI and dependencies
    - confirm target repo path
-   - optional direct `opencode serve` metadata/auth-env name
+   - optional direct endpoint metadata/auth-env name
 
    See:
    - `docs/runbooks/PREPARE_OPENCODE_TARGET_VM.md`
@@ -74,7 +74,7 @@ Use this page when you want the shortest correct setup path for a new `hermes-op
 - MCP owns execution
 - runtime remains OpenCode CLI-backed
 - `ip_address` is declared config, not auto-detected
-- optional `opencode_base_url` and `opencode_auth_token_env` are metadata only unless a new executor mode is explicitly added
+- optional `opencode_base_url` and `opencode_auth_token_env` are metadata only and should not be used as the primary MCP/CLI validation path unless a new executor mode is explicitly added
 
 ## Security reminders
 

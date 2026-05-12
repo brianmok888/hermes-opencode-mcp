@@ -75,8 +75,8 @@ Important: do **not** encode Telegram topic IDs into target definitions or targe
 
 Optional target metadata may include:
 
-- `opencode_base_url`: direct `opencode serve` endpoint for that target, useful for LAN-first operator workflows and human attach/debug handoff
-- `opencode_auth_token_env`: environment variable name that would contain a bearer token or similar auth material for that target's OpenCode endpoint
+- `opencode_base_url`: optional operator-facing metadata for a target's direct OpenCode endpoint, useful for inventory/handoff only
+- `opencode_auth_token_env`: optional operator-facing metadata naming which env var would hold auth material for that target endpoint
 
 Install/bootstrap should ask the operator whether the VM is on the local network or remote, then ask for the IP/address to write into target config.
 
@@ -84,9 +84,9 @@ Suggested install questionnaire:
 
 - VM type: `local network` or `remote`
 - VM IP/address: `<ip-or-hostname>`
-- optional direct OpenCode serve URL: `http://<ip-or-hostname>:4096`
-- optional auth env var name: `<TOKEN_ENV_NAME>`
-- if auth is needed, confirm the VM already has the required auth-bearing environment or service config that `opencode serve` will read
+- optional direct OpenCode endpoint metadata: `<scheme>://<ip-or-hostname>:<port>`
+- optional auth env var name metadata: `<TOKEN_ENV_NAME>`
+- if auth metadata is recorded, confirm the VM already has the required auth-bearing environment or service config for that endpoint
 - if auth is needed, let the user SSH to the VM and generate a token there, for example:
 
 ```bash
@@ -253,7 +253,7 @@ The important design rule is that `chat_id` and `topic_id` should already have b
 - `health` now reports `state_dir`, target count, current running task count, and `startup_recovered_tasks`.
 - `mock` executor is for local verification only; production use should set `HERMES_MCP_EXECUTOR=opencode`.
 - Logs are structured JSON by default and intentionally avoid storing full task prompts or full execution output; only metadata such as task IDs, target IDs, lengths, and execution handles are emitted.
-- If a target defines `opencode_base_url`, treat it as operator-facing metadata for direct LAN or human attach workflows; current task execution still runs through the local OpenCode CLI adapter.
+- If a target defines `opencode_base_url`, treat it as operator-facing metadata only; do not use it as the primary MCP/CLI validation path. Current task execution still runs through the local OpenCode CLI adapter.
 - If Hermes is the caller, keep platform-specific routing concerns outside this repo; topic/thread mapping should be handled before invoking MCP tools.
 
 ## Live E2E verification

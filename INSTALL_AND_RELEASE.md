@@ -120,10 +120,10 @@ Before writing the targets file, ask the operator this questionnaire:
 
 - VM type: `local network` or `remote`
 - VM IP/address: `<ip-or-hostname>`
-- optional direct OpenCode serve URL: `http://<ip-or-hostname>:4096`
-- optional auth env var name: `<TOKEN_ENV_NAME>`
+- optional direct OpenCode endpoint metadata: `<scheme>://<ip-or-hostname>:<port>`
+- optional auth env var name metadata: `<TOKEN_ENV_NAME>`
 
-If auth is needed, confirm the VM already has the required auth-bearing environment or service config that `opencode serve` will read.
+If auth metadata is recorded, confirm the VM already has the required auth-bearing environment or service config for that endpoint.
 
 If auth is needed, let the user SSH to the VM and generate a token there. Example:
 
@@ -161,7 +161,7 @@ sudo tee /etc/hermes-opencode-mcp/targets.json >/dev/null <<'JSON'
     "role": "coding-node",
     "repo_path": "/path/to/repo/on/target",
     "opencode_ready": true,
-    "opencode_base_url": "http://10.0.0.10:4096",
+    "opencode_base_url": "http://10.0.0.10:<port>",
     "opencode_auth_token_env": "VM02_OPENCODE_TOKEN"
   }
 ]
@@ -176,7 +176,7 @@ Rules:
 - `opencode_ready` should be `true` only when that target is actually usable
 - keep target IDs stable and platform-agnostic; do not derive them from Telegram topic IDs
 - during install/bootstrap, ask the operator whether the VM is on the local network or remote, then ask for the IP/address to write into target config
-- optional `opencode_base_url` can record the target's direct `opencode serve` endpoint for LAN-first operator workflows
+- optional `opencode_base_url` can record operator-facing endpoint metadata for inventory/handoff only
 - optional `opencode_auth_token_env` can record which env var should contain auth material for that target endpoint
 
 Verify JSON:

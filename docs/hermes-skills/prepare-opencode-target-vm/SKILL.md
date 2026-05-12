@@ -31,7 +31,7 @@ Use this skill when preparing a worker/target VM that Hermes MCP will point at.
 1. Confirm the VM IP/address on the local network.
 2. Install OpenCode CLI and any required runtime dependencies.
 3. Confirm the repo path that tasks should use.
-4. If direct `opencode serve` handoff is desired, confirm bind address/URL and any VM-side auth config.
+4. If direct endpoint metadata handoff is desired, confirm address/URL and any VM-side auth config without treating it as the primary MCP validation path.
 5. Report back the declared IP/address, repo path, and optional metadata for the control-plane config.
 
 ## Branch B: remote VM via SSH

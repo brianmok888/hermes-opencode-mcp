@@ -34,11 +34,11 @@ Collect before writing config:
 
 - Is the target VM `local network` or `remote`?
 - What IP/address should be written into target config?
-- Optional direct OpenCode serve URL: `http://<ip-or-hostname>:4096`
-- Optional auth env var name: `<TOKEN_ENV_NAME>`
+- Optional direct OpenCode endpoint metadata: `<scheme>://<ip-or-hostname>:<port>`
+- Optional auth env var name metadata: `<TOKEN_ENV_NAME>`
 
-If auth is needed for `opencode serve` metadata/handoff:
-- confirm the target VM already has the auth-bearing env/service config that `opencode serve` reads
+If auth metadata is recorded for operator handoff:
+- confirm the target VM already has the auth-bearing env/service config for that endpoint
 - if needed, let the operator generate the token on the VM, for example:
 
 ```bash

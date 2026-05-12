@@ -7,7 +7,7 @@ This runbook prepares a worker/target VM for use by `hermes-opencode-mcp`.
 - SSH may be used for remote bootstrap only.
 - SSH is not the default runtime execution architecture for this MCP service.
 - The target must have a declared IP/address or hostname for MCP config.
-- If auth exists for direct `opencode serve` handoff, keep token values only on the VM side.
+- If auth exists for optional direct endpoint metadata/handoff, keep token values only on the VM side.
 
 ## Shared prerequisites
 
@@ -15,7 +15,7 @@ Collect:
 - VM type: `local network` or `remote`
 - VM IP/address or hostname
 - target repo path
-- whether direct `opencode serve` metadata is desired
+- whether optional direct endpoint metadata is desired
 - optional auth env var name
 
 ## Path A: local-network VM
@@ -24,7 +24,7 @@ Collect:
 2. Install OpenCode CLI and required dependencies.
 3. Ensure the target repo exists at the desired path.
 4. Confirm the IP/address that should be recorded in MCP config.
-5. If desired, prepare `opencode serve` on the VM side and record only metadata back to MCP.
+5. If desired, prepare a direct endpoint on the VM side and record only metadata back to MCP; do not treat that endpoint as the primary MCP/CLI validation path.
 
 ## Path B: remote VM via SSH
 
