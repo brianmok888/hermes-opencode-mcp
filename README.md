@@ -24,6 +24,8 @@ See [`TOPIC_ROUTING.md`](./TOPIC_ROUTING.md) for the recommended boundary, examp
 
 Sanitized, git-tracked Hermes skill exports live under [`docs/hermes-skills/`](./docs/hermes-skills/). Use the install/check helper scripts under [`scripts/`](./scripts/) to install repo-reviewed skill copies reproducibly into `~/.hermes/skills/`.
 
+For the shortest recommended deployment flow, start with [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).
+
 For a quick map of which skill/runbook to use for install, bootstrap, target prep, operations, routing, and bridge-porting work, see [`docs/RUNBOOK_AND_SKILL_INDEX.md`](./docs/RUNBOOK_AND_SKILL_INDEX.md).
 
 ## Production-oriented capabilities

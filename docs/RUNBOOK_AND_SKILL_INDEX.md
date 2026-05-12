@@ -101,11 +101,13 @@ Primary assets:
 
 For a fresh deployment, usually follow this order:
 
-1. Install/sync the needed Hermes skills
-2. Prepare the target VM
-3. Bootstrap the control-plane MCP service on the Hermes VM
+1. Prepare the target VM
+2. Bootstrap the control-plane MCP service on the Hermes VM
+3. Install/sync the needed Hermes skills
 4. Configure Hermes topic routing if needed
 5. Run day-2 operations using the operations runbook/skill
+
+For the shortest version of this flow, see `docs/QUICKSTART.md`.
 
 ## Security reminders
 
