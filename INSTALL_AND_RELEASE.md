@@ -9,6 +9,7 @@ Goal:
 - verify it
 - optionally install it as a systemd service
 - commit, merge, and push changes
+- preserve any remaining legacy bridge operational assets here before deleting the old bridge repo
 
 ---
 
